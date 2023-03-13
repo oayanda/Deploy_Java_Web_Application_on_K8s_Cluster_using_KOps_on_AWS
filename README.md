@@ -358,5 +358,13 @@ Verify deployment and service are created and working
 k get deploy,pod,svc
 ```
 
-> Note: It might sometime for all to create including the Load balancer
+> ***Note:** It might sometime for all to create including the Load balancer*
 
+![validate cluster](./images/13.png)
+
+Copy the Load balancer URL and view in browser
+
+![validate cluster](./images/14.png)
+
+Login with the default *name:* ***admin_vp*** and *password:* ***admin_vp***
+![validate cluster](./images/15.png)
