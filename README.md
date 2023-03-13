@@ -68,12 +68,12 @@ k get node i-033bf8399b48c258e --show-labels
 
 ![validate cluster](./images/6.png)
 
-## Writing Defination Files
+## Writing definition Files
 
 View Docker images for application here oayanda/vprofileapp:v1
 oayanda/vprofiledb:v1
 
-***Secret Defination File***
+***Secret definition File***
 
 Encode for the application and rabbitmg passwords with base64.
 
@@ -93,11 +93,11 @@ k create -f app-secret.yaml
 k get secret
 ```
 
-> ***Note** for production, the secret defination file should not be public because it might be decoded*.
+> ***Note** for production, the secret definition file should not be public because it might be decoded*.
 
 ![validate cluster](./images/8.png)
 
-***Database Defination File***
+***Database definition File***
 
 ```bash
 apiVersion: apps/v1
@@ -158,3 +158,77 @@ k describe pod pod vprodb-58b465f7f-zfth7
 ```
 
 ![validate cluster](./images/10.png)
+
+***DB Service Definition***
+
+This will only be exposed internally to application and not to the public.
+
+Create definition file *db-cip.yaml*
+
+```bash
+apiVersion: v1
+kind: Service
+metadata:
+  name: vprodb 
+spec:
+  ports:
+    - port: 3306
+      targetPort: vprodb-port
+      protocol: TCP
+  selector:
+    app: vprodb
+  type: ClusterI
+```
+
+***Memcached deployment Definition***
+
+This will use the offical docker image from docker hub.
+
+Create definition file *mcdep.yaml*
+
+```bash
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpromc
+  labels:
+    app: vpromc
+spec:
+  selector:
+    matchLabels:
+      app: vpromc
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: vpromc
+    spec:
+      containers:
+        - name: vpromc
+          image: memcached
+          ports:
+            - name: vpromc-port
+              containerPort: 11211
+
+```
+
+***Memcached Service Definition***
+
+This will only be exposed internally to application and not to the public.
+
+Create definition file *mc-cip.yaml*
+
+```bash
+apiVersion: v1
+kind: Service
+metadata:
+  name: vprocache01
+spec:
+  ports:
+    - port: 11211
+      targetPort: vpromc-port
+      protocol: TCP
+  selector:
+    app: vpromc
+  type: ClusterIP
+```
