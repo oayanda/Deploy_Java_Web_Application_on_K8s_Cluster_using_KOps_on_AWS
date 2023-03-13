@@ -343,3 +343,9 @@ spec:
     app: vproapp
   type: LoadBalancer
 ```
+
+Now, let's deploy all the other definition files
+
+```bash
+k apply -f .
+```
