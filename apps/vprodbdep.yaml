@@ -29,7 +29,7 @@ spec:
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: app-secert
+                  name: app-secret
                   key: db-pass
       nodeSelector:
         zone: us-east-1a
