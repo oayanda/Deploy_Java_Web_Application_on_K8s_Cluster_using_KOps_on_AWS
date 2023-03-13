@@ -98,3 +98,63 @@ k get secret
 ![validate cluster](./images/8.png)
 
 ***Database Defination File***
+
+```bash
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vprodb
+  labels:
+    app: vprodb
+spec:
+  selector:
+    matchLabels:
+      app: vprodb
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: vprodb
+    spec:
+      containers:
+        - name: vprodb
+          image: oayanda/vprofiledb:v1
+          args:
+            - "--ignore-db-dir=lost+found"
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: vpro-db-data
+          ports:
+            - name: vprodb-port
+              containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: db-pass
+      nodeSelector:
+        zone: us-east-1a
+      volumes:
+        - name: vpro-db-data
+          awsElasticBlockStore:
+            volumeID: vol-023c6c76a8a8b98ce
+            fsType: ext4
+```
+
+Create DB deployment
+
+```bash
+k create -f vprodbdep.yaml
+k get pod 
+```
+
+![validate cluster](./images/11.png)
+
+Verify volume is attached to pod
+
+```bash
+k describe pod pod vprodb-58b465f7f-zfth7
+```
+
+![validate cluster](./images/10.png)
