@@ -67,10 +67,28 @@ k get node i-033bf8399b48c258e --show-labels
 View Docker images for application here oayanda/vprofileapp:v1
 oayanda/vprofiledb:v1
 
-Secrets
+***Secret Defination File***
+
 Encode for the application and rabbitmg passwords with base64.
 
 ```bash
 echo -n "<password>" | base64
 ```
+
 ![validate cluster](./images/7.png)
+
+Create Secret and deploy object
+
+```bash
+# create secret object
+k create -f app-secret.yaml
+
+# Show secret
+k get secret
+```
+
+> ***Note** for production, the secret defination file should not be public because it might be decoded*.
+
+![validate cluster](./images/8.png)
+
+***Database Defination File***
