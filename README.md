@@ -349,3 +349,14 @@ Now, let's deploy all the other definition files
 ```bash
 k apply -f .
 ```
+
+![validate cluster](./images/12.png)
+
+Verify deployment and service are created and working
+
+```bash
+k get deploy,pod,svc
+```
+
+> Note: It might sometime for all to create including the Load balancer
+
