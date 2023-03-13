@@ -232,3 +232,114 @@ spec:
     app: vpromc
   type: ClusterIP
 ```
+
+***RabbitMQ Deployment Definition***
+
+This will also use the offical docker image from docker hub.
+
+Create definition file *mcdep.yaml*
+
+```bash
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpromq01
+  labels:
+    app: vpromq01
+spec:
+  selector:
+    matchLabels:
+      app: vpromq01
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: vpromq01
+    spec:
+      containers:
+        - name: vpromq01
+          image: rabbitmq
+          ports:
+            - name: vpromq01-port
+              containerPort: 15672
+          env:
+            - name: RABBIT_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: rmq-pass
+            - name: RABBIT_DEFAULT_USER
+              value: "guest"
+```
+
+***Rabbitmq Service Definition***
+
+This will only be exposed internally to application and not to the public.
+
+Create definition file *mc-cip.yaml*
+
+```bash
+apiVersion: v1
+kind: Service
+metadata:
+  name: vprormq01
+spec:
+  ports:
+    - port: 15672
+      targetPort: vpromq01-port
+      protocol: TCP
+  selector:
+    app: vpromq01
+  type: ClusterIP
+```
+
+***Tomcat Application Deployment***
+
+```bash
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vproapp
+  labels:
+    app: vproapp
+spec:
+  selector:
+    matchLabels:
+      app: vproapp
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: vproapp
+    spec:
+      containers:
+        - name: vproapp
+          image: oayanda/vprofileapp:v1
+          ports:
+            - name: vproapp-port
+              containerPort: 8080
+      initContainers:
+        - name: init-mydb
+          image: busybox
+          command: ['sh', '-c','until nslookup vprodb; do echo waiting for mydb; sleep 2; done;']
+        - name: init-memcache
+          image: busybox
+          command: ['sh', '-c','until nslookup vprocache01; do echo waiting for memcache ; sleep 2; done;']
+```
+
+***Create Service Load balancer for Tomcat application***
+
+```bash
+apiVersion: v1
+kind: Service
+metadata:
+  name: vproapp-service
+spec:
+  ports:
+    - port: 80
+      targetPort: vproapp-port
+      protocol: TCP
+  selector:
+    app: vproapp
+  type: LoadBalancer
+```
