@@ -1,5 +1,8 @@
 # Deploy Java Web Application on K8s Cluster using KOps on AWS.
 
+Prerequites
+
+AWSCLI
 ## Spin up KOps Cluster
 
 Create cluster
@@ -23,4 +26,26 @@ Validate cluster
 ```bash
 kops validate cluster  --state=s3://oayanda-kops-state
 ```
+
 ![validate cluster](./images/3.png)
+
+Create Persistent Volume for DB Node and copy the volume ID for later use. *vol-09570d353208335bb* and the AZ *us-east-1a*.
+
+```bash
+aws ec2 create-volume --availability-zone=us-east-1a --size=3 --volume-type=gp2
+```
+
+![validate cluster](./images/4.png)
+
+Verify the node in us-east-1a
+
+```bash
+
+# Get available Nodes
+k get nodes
+
+# Get more details about a node using the name
+k describe node <name>
+```
+
+![validate cluster](./images/5.png)
