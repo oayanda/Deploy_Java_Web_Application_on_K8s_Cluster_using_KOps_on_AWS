@@ -49,3 +49,28 @@ k describe node <name>
 ```
 
 ![validate cluster](./images/5.png)
+
+Create custome labels for nodes
+
+```bash
+# Create label for node
+k label nodes i-033bf8399b48c258e zone=us-east-1a
+
+# Verify label creation
+k get node i-033bf8399b48c258e --show-labels
+```
+
+![validate cluster](./images/6.png)
+
+## Writing Defination Files
+
+View Docker images for application here oayanda/vprofileapp:v1
+oayanda/vprofiledb:v1
+
+Secrets
+Encode for the application and rabbitmg passwords with base64.
+
+```bash
+echo -n "<password>" | base64
+```
+![validate cluster](./images/7.png)
