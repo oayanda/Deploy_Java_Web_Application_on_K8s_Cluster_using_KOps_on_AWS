@@ -1,1 +1,1 @@
-# Deploy_Java_Web-_Application_on_K8s_Cluster_using_KOps_on_AWS.
+# Deploy Java Web Application on K8s Cluster using KOps on AWS.
