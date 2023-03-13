@@ -368,3 +368,7 @@ Copy the Load balancer URL and view in browser
 
 Login with the default *name:* ***admin_vp*** and *password:* ***admin_vp***
 ![validate cluster](./images/15.png)
+
+Host on Rout53
+
+Clean up
