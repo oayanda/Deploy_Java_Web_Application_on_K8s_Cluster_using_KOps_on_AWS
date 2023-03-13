@@ -29,10 +29,10 @@ kops validate cluster  --state=s3://oayanda-kops-state
 
 ![validate cluster](./images/3.png)
 
-Create Persistent Volume for DB Node and copy the volume ID for later use. *vol-06e0a6c981c045695* and the AZ *us-east-1a*.
+Create Persistent Volume for DB Node and copy the volume ID for later use. *vol-023c6c76a8a8b98ce* and the AZ *us-east-1a*.
 
 ```bash
-aws ec2 create-volume --availability-zone=us-east-1a --size=5 --volume-type=gp2 --tag-specifications 'ResourceType=volume,Tags=[{Key=KuberneteCluster,Value=kube.oayanda.com}]'
+aws ec2 create-volume --availability-zone=us-east-1a --size=5 --volume-type=gp2 --tag-specifications 'ResourceType=volume,Tags=[{Key=KubernetesCluster,Value=kube.oayanda.com}]'
 ```
 
 > ***Note:** For volume mapping, make sure the value of the tag is the same as your k8scluster.*
