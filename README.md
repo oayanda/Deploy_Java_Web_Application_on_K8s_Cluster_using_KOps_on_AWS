@@ -439,5 +439,3 @@ k delete -f .
 ![clean up](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/pa0j50ppmbhybd2hyrc6.png)
 
 Congratulations! you have successfully deploy an application on Kubernetes Cluster.
-
-As always, I look forward to getting your thoughts on this article. Please feel free to leave a comment!
