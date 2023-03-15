@@ -1,9 +1,31 @@
 # Deploy Java Web Application on K8s Cluster using KOps on AWS.
 
-Prerequites
+In this article example how you could deploy a java web application with Kubernetes. This is helpful when your system architecture needs to be high-availability, fault tolerance, easily scalable, portable and platform independent.
 
-AWSCLI
-## Spin up KOps Cluster
+In this setup, I have used [KOps](https://kubernetes.io/docs/setup/production-environment/tools/kops/) to deploy the k8s cluster on AWS. However, you can provision your k8s cluster other options like [AWS EKS](https://aws.amazon.com/eks/) a managed service on AWS. I wrote a simple [script](https://dev.to/oayanda/bash-script-how-to-create-a-k8s-cluster-on-aws-eks-5cfc) to provision k8s cluster on AWS EkS using the eksctl tool.
+
+The web application deployed in this tutorial uses docker images. I have containerized the java application as well as the database and are publicly available on my docker registry. I have also used official docker images for RabbitMQ (as the message broker) and Memcached( to speed up the database by reducing the amount of reads on the database.) and finally used AWS route53 as DNS.
+
+Click below list to view the docker images
+- [Java Application](https://hub.docker.com/layers/oayanda/vprofileapp/v1/images/sha256-b82849c5833d7ba61b136e1bf4f5a6e77dc3102e0c0ba8a9a2ed04fac0d75230?context=repo)
+- [Database](https://hub.docker.com/layers/oayanda/vprofiledb/v1/images/sha256-050a9a08a7bc72cb2a026927f4cc9a9fe9077265efbd528a8140c5fff509c5ef?context=repo)
+- [RabbitMQ](https://hub.docker.com/_/rabbitmq)
+- [Memcached](https://hub.docker.com/_/memcached)
+
+
+**Prerequisites**
+- [AWSCLIv2 installed and configured](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- [Have k8s Cluster Setup](https://dev.to/oayanda/bash-script-how-to-create-a-k8s-cluster-on-aws-eks-5cfc)
+- [AWS account](https://aws.amazon.com/free/) 
+- [Understanding docker or containers](https://dev.to/oayanda/getting-started-docker-container-docker-image-dockerfile-2oj9)
+- [Basic understanding of K8s objects](https://dev.to/oayanda/explained-pod-replicaset-and-deployment-in-kubernetes-2kf)
+
+
+Let's Begin!!!
+
+You should skip this step if you are using another cluster setup.
+
+## Spin up KOps Cluster in the terminal
 
 Create cluster
 
@@ -11,7 +33,7 @@ Create cluster
 kops create cluster --name=kube.oayanda.com --state=s3://oayanda-kops-state --zones=us-east-1a,us-east-1b --node-count=2 --node-size=t3.small --master-size=t3.medium --dns-zone=kube.oayanda.com
 ```
 
-![create cluster](./images/1.png)
+![create cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/56e7o59u7tr3e455c2r9.png)
 
 Update cluster
 
@@ -19,7 +41,7 @@ Update cluster
  kops update cluster --name kube.oayanda.com --state=s3://oayanda-kops-state --yes --admin
 ```
 
-![update cluster](./images/2.png)
+![update cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/crla1zb7dqv5i8lm1mfy.png)
 
 Validate cluster
 
@@ -27,23 +49,26 @@ Validate cluster
 kops validate cluster  --state=s3://oayanda-kops-state
 ```
 
-![validate cluster](./images/3.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/tyztdje9gqku0d0fh5hj.png)
 
-Create Persistent Volume for DB Node and copy the volume ID for later use. *vol-023c6c76a8a8b98ce* and the AZ *us-east-1a*.
+
+Create Persistent EBS volume for DB pod. Copy the volume ID for later use. *vol-023c6c76a8a8b98ce* and the AZ *us-east-1a*.
+
+Copy the following code snippet into your terminal. 
 
 ```bash
 aws ec2 create-volume --availability-zone=us-east-1a --size=5 --volume-type=gp2 --tag-specifications 'ResourceType=volume,Tags=[{Key=KubernetesCluster,Value=kube.oayanda.com}]'
 ```
 
-> ***Note:** For volume mapping, make sure the value of the tag is the same as your k8scluster.*
+> _**Note:** For volume mapping, make sure the value of the tag is the same as your kubernetes cluster._
 
-![validate cluster](./images/4.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/uj7bf8hpvy28bcf13roq.png)
 
-Verfiy from AWS console
+Verify from AWS console
 
-![validate cluster](./images/9.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/3tbt4larx1shp79hvnkb.png)
 
-Verify the node in us-east-1a
+Verify which node is located in us-east-1a, which is where the volume was created.
 
 ```bash
 
@@ -53,10 +78,11 @@ k get nodes
 # Get more details about a node using the name
 k describe node <name>
 ```
+> _Note: You can create an alias for kubectl in your terminal. `alias k=kubectl`_
 
-![validate cluster](./images/5.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/1khkbrpfewgc3ydm77y0.png)
 
-Create custome labels for nodes
+Create custom labels for nodes
 
 ```bash
 # Create label for node
@@ -66,24 +92,32 @@ k label nodes i-033bf8399b48c258e zone=us-east-1a
 k get node i-033bf8399b48c258e --show-labels
 ```
 
-![validate cluster](./images/6.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/sacuipl49rnv2ay0tl2s.png)
 
 ## Writing definition Files
 
-View Docker images for application here oayanda/vprofileapp:v1
-oayanda/vprofiledb:v1
-
 ***Secret definition File***
+The secret object help to keep sensitive data like password. However, by default, stored unencrypted in the API server's underlying data store (etcd). Anyone with API access can retrieve or modify a Secret, and so can anyone with access to etcd. [Read more from official documentation](https://kubernetes.io/docs/concepts/configuration/secret/)
 
-Encode for the application and rabbitmg passwords with base64.
+Encode for the application and RabbitMQ passwords with base64.
 
 ```bash
 echo -n "<password>" | base64
 ```
 
-![validate cluster](./images/7.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/e4acknfk92zu3j1fqjjn.png)
 
-Create Secret and deploy object
+Create a file app-secret.yaml
+```bash
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+type: Opaque
+data:
+  db-pass: cGFzcw==
+  rmq-pass: Z3Vlc3Q=
+```
 
 ```bash
 # create secret object
@@ -93,11 +127,12 @@ k create -f app-secret.yaml
 k get secret
 ```
 
-> ***Note** for production, the secret definition file should not be public because it might be decoded*.
+> _Note: for production, the secret definition file should not be public because it might be decoded._
 
-![validate cluster](./images/8.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/0s8ex1v4eo5wtz4uz1z1.png)
 
 ***Database definition File***
+For this file, you need the volume ID you created earlier and the zone the volume was created.
 
 ```bash
 apiVersion: apps/v1
@@ -149,7 +184,7 @@ k create -f vprodbdep.yaml
 k get pod 
 ```
 
-![validate cluster](./images/11.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/vkaoeqtxj60odb587ixa.png)
 
 Verify volume is attached to pod
 
@@ -157,7 +192,7 @@ Verify volume is attached to pod
 k describe pod pod vprodb-58b465f7f-zfth7
 ```
 
-![validate cluster](./images/10.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/f12qark9kjfhpzkttxpy.png)
 
 ***DB Service Definition***
 
@@ -182,7 +217,7 @@ spec:
 
 ***Memcached deployment Definition***
 
-This will use the offical docker image from docker hub.
+This will use the official docker image from docker hub.
 
 Create definition file *mcdep.yaml*
 
@@ -214,7 +249,7 @@ spec:
 
 ***Memcached Service Definition***
 
-This will only be exposed internally to application and not to the public.
+This will only be exposed internally to application and not to the public as well.
 
 Create definition file *mc-cip.yaml*
 
@@ -235,7 +270,7 @@ spec:
 
 ***RabbitMQ Deployment Definition***
 
-This will also use the offical docker image from docker hub.
+This will also use the official docker image from docker hub.
 
 Create definition file *mcdep.yaml*
 
@@ -274,7 +309,7 @@ spec:
 
 ***Rabbitmq Service Definition***
 
-This will only be exposed internally to application and not to the public.
+This will only be exposed internally to application using the Cluster IP type.
 
 Create definition file *mc-cip.yaml*
 
@@ -293,7 +328,8 @@ spec:
   type: ClusterIP
 ```
 
-***Tomcat Application Deployment***
+***Java Application Deployment***
+I have used two inicontainers which are temporary containers which are dependencies for the Java application. Their job is to make sure the database and memcache container service are ready before the Java application container starts.
 
 ```bash
 apiVersion: apps/v1
@@ -320,14 +356,14 @@ spec:
               containerPort: 8080
       initContainers:
         - name: init-mydb
-          image: busybox
+          image: busybox:1.28
           command: ['sh', '-c','until nslookup vprodb; do echo waiting for mydb; sleep 2; done;']
         - name: init-memcache
-          image: busybox
+          image: busybox:1.28
           command: ['sh', '-c','until nslookup vprocache01; do echo waiting for memcache ; sleep 2; done;']
 ```
 
-***Create Service Load balancer for Tomcat application***
+***Create Service Load balancer for Java application***
 
 ```bash
 apiVersion: v1
@@ -350,7 +386,7 @@ Now, let's deploy all the other definition files
 k apply -f .
 ```
 
-![validate cluster](./images/12.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/2ct40t4c1varehhlkqws.png)
 
 Verify deployment and service are created and working
 
@@ -358,17 +394,50 @@ Verify deployment and service are created and working
 k get deploy,pod,svc
 ```
 
-> ***Note:** It might sometime for all to create including the Load balancer*
+> _Note: It might sometime for all objects to created including the Load balancer._
 
-![validate cluster](./images/13.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/no57fas6vko5fl4ba1qo.png)
 
 Copy the Load balancer URL and view in browser
 
-![validate cluster](./images/14.png)
+![load balancer](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/k0br99xcjjk8hejkee5g.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/z3hs0w5tux0rol92a0kd.png)
 
 Login with the default *name:* ***admin_vp*** and *password:* ***admin_vp***
-![validate cluster](./images/15.png)
+![validate cluster](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/dj3a03nua04777g1p0hc.png)
 
-Host on Rout53
+**Host on Rout53**
+_Step 1_
+If you are using an external registrar (for example, GoDaddy).
+- Create a Hosted Zone in Route53
+- Copy the NS records and update it on your external registrar.
+_Step 2_
 
-Clean up
+In the Hosted zone on Rout53
+Click create record
+
+![create record](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/8kpar4x1437zgj0dug1c.png)
+- Enter a name for your application
+- Click on the _Alias_ radio button
+- Under the _Route traffic to_, select Alias to Application and Classic load balancer
+- Select the region your application is deployed
+- Select the Load balancer
+- Click Create records
+> This will take some seconds for propagation. 
+
+![route 53](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/faf1xym7h81ilpcy6cqv.png)
+
+View in the browser
+
+![domain](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/tyi1wj7zhcyjer6do0u9.png)
+
+Clean Up
+```bash
+# Delete all objects
+k delete -f .
+```
+![clean up](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/pa0j50ppmbhybd2hyrc6.png)
+
+Congratulations! you have successfully deploy an application on Kubernetes Cluster.
+
+As always, I look forward to getting your thoughts on this article. Please feel free to leave a comment!
